@@ -23,9 +23,11 @@ export async function onRequestGet(context) {
       console.log('catalog', catalog);
       query = `SELECT s.*,c.catelog FROM sites s
                INNER JOIN category c ON s.catelog_id = c.id
-               WHERE c.catelog = ? ORDER BY s.sort_order ASC, s.create_time DESC`;
-      countQuery = 'SELECT COUNT(*) as total FROM sites WHERE catelog_id = ?';
-      queryBindParams = [catalog];
+               WHERE c.catelog = ? ORDER BY s.sort_order ASC, s.create_time DESC LIMIT ? OFFSET ?`;
+      countQuery = `SELECT COUNT(*) as total FROM sites s 
+                    INNER JOIN category c ON s.catelog_id = c.id 
+                    WHERE c.catelog = ?`;
+      queryBindParams = [catalog, pageSize, offset];
       countQueryParams = [catalog];
     }
 

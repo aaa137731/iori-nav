@@ -10,6 +10,33 @@
       href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700&display=swap"
       rel="stylesheet"
     />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              primary: {
+                50: '#f3f5f9', 100: '#e1e7f1', 200: '#c3d0e3', 300: '#9cb3d1',
+                400: '#6c8fba', 500: '#416d9d', 600: '#305580', 700: '#254267',
+                800: '#1d3552', 900: '#192e45', 950: '#101e2d',
+              },
+              secondary: {
+                50: '#fdf8f3', 100: '#f6ede1', 200: '#ead6ba', 300: '#dfc19a',
+                400: '#d2aa79', 500: '#b88d58', 600: '#a17546', 700: '#835b36',
+                800: '#6b492c', 900: '#5a3e26', 950: '#2f1f13',
+              },
+              accent: {
+                50: '#f2faf6', 100: '#d9f0e5', 200: '#b4dfcb', 300: '#89caa9',
+                400: '#61b48a', 500: '#3c976d', 600: '#2e7755', 700: '#265c44',
+                800: '#204b38', 900: '#1b3e30', 950: '#0e221b',
+              },
+            },
+            fontFamily: { sans: ['Noto Sans SC', 'sans-serif'] },
+          }
+        }
+      }
+    </script>
   </head>
   <body>
     <div class="container">
@@ -26,9 +53,13 @@
       </header>
 
       <div class="import-export">
+        <select id="categoryFilter" class="custom-select mr-2 !w-auto" style="min-width: 120px;">
+          <option value="">所有分类</option>
+        </select>
         <input
           type="text"
           id="searchInput"
+          class="flex-grow max-w-xs mr-auto px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
           placeholder="搜索书签(名称, URL, 分类)"
         />
         <input
@@ -37,11 +68,13 @@
           accept=".json,.html,.htm"
           style="display: none"
         />
-        <button id="importBtn">导入</button>
-        <button id="exportBtn">导出</button>
-        <button id="addCategoryBtn">新增分类</button>
-        <button id="addBookmarkBtn">新增书签</button>
-        <button id="aiSettingsBtn">AI 设置</button>
+        <div class="flex flex-wrap gap-2">
+            <button id="importBtn" class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 transition-colors">导入</button>
+            <button id="exportBtn" class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 transition-colors">导出</button>
+            <button id="addCategoryBtn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition-colors">新增分类</button>
+            <button id="addBookmarkBtn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors">新增书签</button>
+            <button id="aiSettingsBtn" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 transition-colors">AI 设置</button>
+        </div>
       </div>
 
       <!-- 新增分类模态框 -->
@@ -252,28 +285,24 @@
         </div>
 
         <div id="config" class="tab-content active">
-          <div class="table-wrapper">
-            <table id="configTable">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Name</th>
-                  <th>URL</th>
-                  <th>Logo</th>
-                  <th>Description</th>
-                  <th>Catelog</th>
-                  <th>排序</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody id="configTableBody">
-                <!-- data render by js -->
-              </tbody>
-            </table>
-            <div class="pagination">
-              <button id="prevPage" disabled>上一页</button>
-              <span id="currentPage">1</span>/<span id="totalPages">1</span>
-              <button id="nextPage" disabled>下一页</button>
+          <div class="grid-wrapper">
+            <div id="configGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+              <!-- data render by js -->
+            </div>
+            <div class="pagination mt-6 flex justify-center items-center gap-4">
+              <button id="prevPage" disabled class="px-4 py-2 bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">上一页</button>
+              <span class="text-gray-600">
+                  <span id="currentPage" class="font-medium">1</span> / <span id="totalPages">1</span>
+              </span>
+              <button id="nextPage" disabled class="px-4 py-2 bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">下一页</button>
+              
+              <select id="pageSizeSelect" class="ml-2 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500 bg-white">
+                  <option value="50" selected>50条/页</option>
+                  <option value="100">100条/页</option>
+                  <option value="200">200条/页</option>
+                  <option value="500">500条/页</option>
+                  <option value="10000">全部</option>
+              </select>
             </div>
           </div>
         </div>
@@ -308,33 +337,22 @@
         </div>
 
         <div id="categories" class="tab-content">
-          <div class="table-wrapper">
-            <div class="category-toolbar">
-              <p class="category-hint">
-                设置分类排序值（数字越小越靠前），留空表示使用默认顺序。
+          <div class="grid-wrapper">
+            <div class="category-toolbar mb-4 flex justify-between items-center">
+              <p class="category-hint text-gray-500 text-sm">
+                拖动卡片可调整排序（无需手动输入排序值）
               </p>
-              <button id="refreshCategories" type="button">刷新</button>
+              <button id="refreshCategories" type="button" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-1 rounded transition-colors text-sm">刷新</button>
             </div>
-            <table id="categoryTable">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>分类</th>
-                  <th>书签数量</th>
-                  <th>排序值</th>
-                  <th>操作</th>
-                </tr>
-              </thead>
-              <tbody id="categoryTableBody">
-                <tr>
-                  <td colspan="4">加载中...</td>
-                </tr>
-              </tbody>
-            </table>
-            <div class="pagination">
-              <button id="categoryPrevPage" disabled>上一页</button>
-              <span id="categoryCurrentPage">1</span>/<span id="categoryTotalPages">1</span>
-              <button id="categoryNextPage" disabled>下一页</button>
+            <div id="categoryGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+               <!-- data render by js -->
+            </div>
+            <div class="pagination mt-6 flex justify-center items-center gap-4">
+              <button id="categoryPrevPage" disabled class="px-4 py-2 bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">上一页</button>
+              <span class="text-gray-600">
+                  <span id="categoryCurrentPage" class="font-medium">1</span> / <span id="categoryTotalPages">1</span>
+              </span>
+              <button id="categoryNextPage" disabled class="px-4 py-2 bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">下一页</button>
             </div>
           </div>
         </div>

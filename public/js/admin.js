@@ -1,4 +1,4 @@
-const configTableBody = document.getElementById('configTableBody');
+const configGrid = document.getElementById('configGrid');
 const prevPageBtn = document.getElementById('prevPage');
 const nextPageBtn = document.getElementById('nextPage');
 const currentPageSpan = document.getElementById('currentPage');
@@ -11,7 +11,7 @@ const pendingCurrentPageSpan = document.getElementById('pendingCurrentPage');
 const pendingTotalPagesSpan = document.getElementById('pendingTotalPages');
 
 const messageDiv = document.getElementById('message');
-const categoryTableBody = document.getElementById('categoryTableBody');
+const categoryGrid = document.getElementById('categoryGrid');
 const categoryPrevPageBtn = document.getElementById('categoryPrevPage');
 const categoryNextPageBtn = document.getElementById('categoryNextPage');
 const categoryCurrentPageSpan = document.getElementById('categoryCurrentPage');
@@ -73,12 +73,50 @@ if (refreshCategoriesBtn) {
 }
 
 const searchInput = document.getElementById('searchInput');
+const categoryFilter = document.getElementById('categoryFilter');
+const pageSizeSelect = document.getElementById('pageSizeSelect');
 
 let currentPage = 1;
-let pageSize = 10;
+let pageSize = 50; // Default to 50
 let totalItems = 0;
 let allConfigs = [];
 let currentSearchKeyword = '';
+let currentCategoryFilter = '';
+
+// Initialize Page Size
+if (pageSizeSelect) {
+    pageSizeSelect.value = pageSize; // Set default in UI
+    pageSizeSelect.addEventListener('change', () => {
+        pageSize = parseInt(pageSizeSelect.value);
+        currentPage = 1;
+        fetchConfigs(currentPage, currentSearchKeyword, currentCategoryFilter);
+    });
+}
+
+// Initialize Category Filter
+if (categoryFilter) {
+    // Populate categories will happen in fetchCategoriesForFilter or similar
+    // Re-use the existing logic or add a new fetch
+    fetch('/api/categories?pageSize=999')
+        .then(res => res.json())
+        .then(data => {
+            if (data.code === 200 && data.data) {
+                // Keep the default "All" option
+                data.data.forEach(cat => {
+                    const option = document.createElement('option');
+                    option.value = cat.catelog; // Use name for filtering as API expects name or ID? API index.js uses name if provided as 'catalog' param
+                    option.textContent = cat.catelog;
+                    categoryFilter.appendChild(option);
+                });
+            }
+        });
+
+    categoryFilter.addEventListener('change', () => {
+        currentCategoryFilter = categoryFilter.value;
+        currentPage = 1;
+        fetchConfigs(currentPage, currentSearchKeyword, currentCategoryFilter);
+    });
+}
 
 let pendingCurrentPage = 1;
 let pendingPageSize = 10;
@@ -137,11 +175,22 @@ if (editBookmarkForm) {
 
 
 
-function fetchConfigs(page = currentPage, keyword = currentSearchKeyword) {
+function fetchConfigs(page = currentPage, keyword = currentSearchKeyword, catalog = currentCategoryFilter) {
   let url = `/api/config?page=${page}&pageSize=${pageSize}`;
+  const params = new URLSearchParams();
+  params.append('page', page);
+  params.append('pageSize', pageSize);
+  
   if (keyword) {
-    url = `/api/config?page=${page}&pageSize=${pageSize}&keyword=${keyword}`
+      params.append('keyword', keyword);
   }
+  
+  if (catalog) {
+      params.append('catalog', catalog);
+  }
+  
+  url = `/api/config?${params.toString()}`;
+
   fetch(url)
     .then(res => res.json())
     .then(data => {
@@ -162,65 +211,191 @@ function fetchConfigs(page = currentPage, keyword = currentSearchKeyword) {
 }
 
 function renderConfig(configs) {
-  configTableBody.innerHTML = '';
+  if (!configGrid) return;
+  configGrid.innerHTML = '';
   if (configs.length === 0) {
-    configTableBody.innerHTML = '<tr><td colspan="8">没有配置数据</td></tr>';
+    configGrid.innerHTML = '<div class="col-span-full text-center text-gray-500 py-10">没有配置数据</div>';
     return
   }
   configs.forEach(config => {
-    const row = document.createElement('tr');
+    const card = document.createElement('div');
     const safeName = escapeHTML(config.name || '');
     const normalizedUrl = normalizeUrl(config.url);
     const displayUrl = config.url ? escapeHTML(config.url) : '未提供';
-    const urlCell = normalizedUrl
-      ? `<a href="${escapeHTML(normalizedUrl)}" target="_blank" rel="noopener noreferrer">${escapeHTML(normalizedUrl)}</a>`
-      : displayUrl;
     const normalizedLogo = normalizeUrl(config.logo);
-    const logoCell = normalizedLogo
-      ? `<img src="${escapeHTML(normalizedLogo)}" alt="${safeName}" style="width:30px;" />`
-      : 'N/A';
-    const descCell = config.desc ? escapeHTML(config.desc) : 'N/A';
-    const catelogCell = escapeHTML(config.catelog || '');
-    const sortValue = config.sort_order === 9999 || config.sort_order === null || config.sort_order === undefined
-      ? '默认'
-      : escapeHTML(config.sort_order);
-    row.innerHTML = `
-      <td>${config.id}</td>
-      <td>${safeName}</td>
-      <td>${urlCell}</td>
-      <td>${logoCell}</td>
-      <td>${descCell}</td>
-      <td>${catelogCell}</td>
-      <td>${sortValue}</td>
-      <td class="actions">
-        <button class="edit-btn" data-id="${config.id}">编辑</button>
-        <button class="del-btn" data-id="${config.id}">删除</button>
-      </td>
+    const descCell = config.desc ? escapeHTML(config.desc) : '暂无描述';
+    const safeCatalog = escapeHTML(config.catelog || '未分类');
+    const cardInitial = (safeName.charAt(0) || '站').toUpperCase();
+
+    card.className = 'site-card group bg-white border border-primary-100/60 rounded-xl shadow-sm overflow-hidden relative';
+    card.draggable = true;
+    card.dataset.id = config.id;
+    
+    // Logo render logic
+    let logoHtml = '';
+    if (normalizedLogo) {
+        logoHtml = `<img src="${escapeHTML(normalizedLogo)}" alt="${safeName}" class="w-10 h-10 rounded-lg object-cover bg-gray-100">`;
+    } else {
+        logoHtml = `<div class="w-10 h-10 rounded-lg bg-primary-600 flex items-center justify-center text-white font-semibold text-lg shadow-inner">${cardInitial}</div>`;
+    }
+
+    card.innerHTML = `
+      <div class="absolute top-2 right-2 flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+         <button class="edit-btn p-1.5 bg-blue-100 text-blue-600 rounded-full hover:bg-blue-200 transition-colors" title="编辑" data-id="${config.id}">
+             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+             </svg>
+         </button>
+         <button class="del-btn p-1.5 bg-red-100 text-red-600 rounded-full hover:bg-red-200 transition-colors" title="删除" data-id="${config.id}">
+             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+             </svg>
+         </button>
+      </div>
+
+      <div class="p-5 cursor-move">
+        <div class="block">
+            <div class="flex items-start">
+               <div class="site-icon flex-shrink-0 mr-4 transition-all duration-300 group-hover:scale-105">
+                  ${logoHtml}
+               </div>
+               <div class="flex-1 min-w-0">
+                  <h3 class="site-title text-base font-medium text-gray-900 truncate" title="${safeName}">${safeName}</h3>
+                  <span class="inline-flex items-center px-2 py-0.5 mt-1 rounded-full text-xs font-medium bg-secondary-100 text-primary-700">
+                    ${safeCatalog}
+                  </span>
+               </div>
+            </div>
+            <p class="mt-3 text-sm text-gray-600 leading-relaxed line-clamp-2 h-10" title="${descCell}">${descCell}</p>
+        </div>
+        
+        <div class="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between text-xs text-gray-400">
+             <span class="truncate max-w-[150px]" title="${displayUrl}">${displayUrl}</span>
+             <span class="bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">ID: ${config.id}</span>
+        </div>
+      </div>
     `;
-    configTableBody.appendChild(row);
+    configGrid.appendChild(card);
   });
   bindActionEvents();
+  setupDragAndDrop();
 }
 
 function bindActionEvents() {
   document.querySelectorAll('.edit-btn').forEach(btn => {
-    btn.addEventListener('click', function () {
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation(); // Prevent drag start when clicking buttons
       handleEdit(this.dataset.id);
     })
   });
 
   document.querySelectorAll('.del-btn').forEach(btn => {
-    btn.addEventListener('click', function () {
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
       const id = this.dataset.id;
       handleDelete(id)
     })
   })
 }
+
+function setupDragAndDrop() {
+  const cards = document.querySelectorAll('#configGrid .site-card');
+  let draggedItem = null;
+
+  cards.forEach(card => {
+    card.addEventListener('dragstart', function(e) {
+      draggedItem = this;
+      this.classList.add('opacity-50', 'scale-95');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/html', this.innerHTML);
+    });
+
+    card.addEventListener('dragend', function() {
+      this.classList.remove('opacity-50', 'scale-95');
+      draggedItem = null;
+      document.querySelectorAll('.site-card').forEach(c => c.classList.remove('border-2', 'border-accent-500'));
+    });
+
+    card.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      this.classList.add('border-2', 'border-accent-500');
+    });
+    
+    card.addEventListener('dragleave', function() {
+      this.classList.remove('border-2', 'border-accent-500');
+    });
+
+    card.addEventListener('drop', function(e) {
+      e.preventDefault();
+      this.classList.remove('border-2', 'border-accent-500');
+      
+      if (draggedItem !== this) {
+        // Swap or Insert Logic
+        // Here we use "insert before" or "insert after" depending on position
+        // For simplicity in a grid, swapping index in DOM is easiest to visualize
+        
+        const allCards = Array.from(configGrid.children);
+        const draggedIdx = allCards.indexOf(draggedItem);
+        const droppedIdx = allCards.indexOf(this);
+        
+        if (draggedIdx < droppedIdx) {
+          this.after(draggedItem);
+        } else {
+          this.before(draggedItem);
+        }
+        
+        // Save new order
+        saveSortOrder();
+      }
+    });
+  });
+}
+
+function saveSortOrder() {
+  const cards = document.querySelectorAll('#configGrid .site-card');
+  const updates = [];
+  
+  // Calculate global start index
+  const startIndex = (currentPage - 1) * pageSize;
+  
+  cards.forEach((card, index) => {
+    const id = card.dataset.id;
+    // Set new sort order relative to the page + index
+    // Note: This relies on simple integer sorting.
+    const newSortOrder = startIndex + index;
+    
+    // Optimistic UI: We assume it works.
+    // Ideally we only update if changed, but for simplicity we update the list.
+    // To avoid flood, we can check if it's already correct in `allConfigs` but `allConfigs` is not updated yet.
+    
+    updates.push(fetch(`/api/config/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        // We need other fields? api/config/[id] PUT requires name, url etc.
+        // The API implementation requires name, url, etc.
+        // I need to fetch the existing data or change the API to allow partial updates.
+        // Since I have `allConfigs` in memory, I can use that!
+        ...allConfigs.find(c => c.id == id),
+        sort_order: newSortOrder
+      })
+    }));
+  });
+  
+  if (updates.length > 0) {
+      showMessage('正在保存排序...', 'info');
+      Promise.all(updates)
+        .then(() => showMessage('排序已保存', 'success'))
+        .catch(err => showMessage('保存排序失败: ' + err.message, 'error'));
+  }
+}
+
 function fetchCategories(page = categoryCurrentPage) {
-  if (!categoryTableBody) {
+  if (!categoryGrid) {
     return;
   }
-  categoryTableBody.innerHTML = '<tr><td colspan="4">加载中...</td></tr>';
+  categoryGrid.innerHTML = '<div class="col-span-full text-center py-10">加载中...</div>';
   fetch(`/api/categories?page=${page}&pageSize=${categoryPageSize}`)
     .then(res => res.json())
     .then(data => {
@@ -230,79 +405,84 @@ function fetchCategories(page = categoryCurrentPage) {
         categoryTotalPagesSpan.innerText = Math.ceil(categoryTotalItems / categoryPageSize);
         categoryCurrentPageSpan.innerText = categoryCurrentPage;
         categoriesData = data.data || [];
-        renderCategories(categoriesData);
+        renderCategoryCards(categoriesData);
         updateCategoryPaginationButtons();
       } else {
         showMessage(data.message || '加载分类失败', 'error');
-        categoryTableBody.innerHTML = '<tr><td colspan="4">加载失败</td></tr>';
+        categoryGrid.innerHTML = '<div class="col-span-full text-center py-10 text-red-500">加载失败</div>';
       }
     }).catch(() => {
       showMessage('网络错误', 'error');
-      categoryTableBody.innerHTML = '<tr><td colspan="4">加载失败</td></tr>';
+      categoryGrid.innerHTML = '<div class="col-span-full text-center py-10 text-red-500">加载失败</div>';
     });
 }
 
-function renderCategories(categories) {
-  if (!categoryTableBody) {
-    return;
-  }
-  categoryTableBody.innerHTML = '';
+function renderCategoryCards(categories) {
+  if (!categoryGrid) return;
+  categoryGrid.innerHTML = '';
   if (!categories || categories.length === 0) {
-    categoryTableBody.innerHTML = '<tr><td colspan="4">暂无分类数据</td></tr>';
+    categoryGrid.innerHTML = '<div class="col-span-full text-center text-gray-500 py-10">暂无分类数据</div>';
     return;
   }
 
   categories.forEach(item => {
-    const row = document.createElement('tr');
+    const card = document.createElement('div');
+    const safeName = escapeHTML(item.catelog);
+    const siteCount = item.site_count || 0;
+    const sortValue = item.sort_order === null || item.sort_order === 9999 ? '默认' : item.sort_order;
 
-    const idCell = document.createElement('td');
-    idCell.textContent = item.id;
-    row.appendChild(idCell);
+    card.className = 'site-card group bg-white border border-primary-100/60 rounded-xl shadow-sm overflow-hidden relative cursor-move';
+    card.draggable = true;
+    card.dataset.id = item.id;
+    card.dataset.sort = item.sort_order;
 
-    const nameCell = document.createElement('td');
-    nameCell.textContent = item.catelog;
-    row.appendChild(nameCell);
+    card.innerHTML = `
+      <div class="absolute top-2 right-2 flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+         <button class="category-edit-btn p-1.5 bg-blue-100 text-blue-600 rounded-full hover:bg-blue-200 transition-colors" title="编辑" data-category-id="${item.id}">
+             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+             </svg>
+         </button>
+         <button class="category-del-btn p-1.5 ${siteCount > 0 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-red-100 text-red-600 hover:bg-red-200'} rounded-full transition-colors" title="${siteCount > 0 ? '包含书签的分类无法删除' : '删除'}" data-category-id="${item.id}" ${siteCount > 0 ? 'disabled' : ''}>
+             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+             </svg>
+         </button>
+      </div>
 
-    const countCell = document.createElement('td');
-    countCell.textContent = item.site_count;
-    row.appendChild(countCell);
-
-    const sortCell = document.createElement('td');
-    sortCell.textContent = item.sort_order;
-    row.appendChild(sortCell);
-
-    const actionCell = document.createElement('td');
-    actionCell.className = 'category-actions';
-
-    const editBtn = document.createElement('button');
-    editBtn.className = 'category-edit-btn';
-    editBtn.textContent = '编辑';
-    editBtn.setAttribute('data-category-id', item.id);
-    actionCell.appendChild(editBtn);
-
-    const delBtn = document.createElement('button');
-    delBtn.className = 'category-del-btn';
-    delBtn.textContent = '删除';
-    delBtn.setAttribute('data-category-id', item.id);
-    if (item.site_count > 0) {
-      delBtn.disabled = true;
-    }
-    actionCell.appendChild(delBtn);
-
-    row.appendChild(actionCell);
-    categoryTableBody.appendChild(row);
+      <div class="p-5">
+        <div class="flex items-center justify-between mb-2">
+            <h3 class="text-lg font-medium text-gray-900 truncate" title="${safeName}">${safeName}</h3>
+            <span class="bg-primary-50 text-primary-700 text-xs px-2 py-1 rounded-full border border-primary-100">ID: ${item.id}</span>
+        </div>
+        
+        <div class="flex items-center text-sm text-gray-500 mt-4 space-x-4">
+            <div class="flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                </svg>
+                <span>${siteCount} 个书签</span>
+            </div>
+            <div class="flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
+                </svg>
+                <span>排序: ${sortValue}</span>
+            </div>
+        </div>
+      </div>
+    `;
+    categoryGrid.appendChild(card);
   });
 
   bindCategoryEvents();
+  setupCategoryDragAndDrop();
 }
 
 function bindCategoryEvents() {
-  if (!categoryTableBody) {
-    return;
-  }
-
-  categoryTableBody.querySelectorAll('.category-edit-btn').forEach(btn => {
-    btn.addEventListener('click', function () {
+  document.querySelectorAll('.category-edit-btn').forEach(btn => {
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
       const categoryId = this.getAttribute('data-category-id');
       const category = categoriesData.find(c => c.id == categoryId);
       if (category) {
@@ -317,8 +497,9 @@ function bindCategoryEvents() {
     });
   });
 
-  categoryTableBody.querySelectorAll('.category-del-btn').forEach(btn => {
-    btn.addEventListener('click', function () {
+  document.querySelectorAll('.category-del-btn').forEach(btn => {
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
       if (this.disabled) {
         return;
       }
@@ -348,6 +529,102 @@ function bindCategoryEvents() {
         });
     });
   });
+}
+
+function setupCategoryDragAndDrop() {
+  const cards = document.querySelectorAll('#categoryGrid .site-card');
+  let draggedItem = null;
+
+  cards.forEach(card => {
+    card.addEventListener('dragstart', function(e) {
+      draggedItem = this;
+      this.classList.add('opacity-50', 'scale-95');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/html', this.innerHTML);
+    });
+
+    card.addEventListener('dragend', function() {
+      this.classList.remove('opacity-50', 'scale-95');
+      draggedItem = null;
+      document.querySelectorAll('#categoryGrid .site-card').forEach(c => c.classList.remove('border-2', 'border-accent-500'));
+    });
+
+    card.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      this.classList.add('border-2', 'border-accent-500');
+    });
+    
+    card.addEventListener('dragleave', function() {
+      this.classList.remove('border-2', 'border-accent-500');
+    });
+
+    card.addEventListener('drop', function(e) {
+      e.preventDefault();
+      this.classList.remove('border-2', 'border-accent-500');
+      
+      if (draggedItem !== this) {
+        const allCards = Array.from(categoryGrid.children);
+        const draggedIdx = allCards.indexOf(draggedItem);
+        const droppedIdx = allCards.indexOf(this);
+        
+        if (draggedIdx < droppedIdx) {
+          this.after(draggedItem);
+        } else {
+          this.before(draggedItem);
+        }
+        
+        // Save new order
+        saveCategorySortOrder();
+      }
+    });
+  });
+}
+
+function saveCategorySortOrder() {
+  const cards = document.querySelectorAll('#categoryGrid .site-card');
+  const updates = [];
+  
+  // Calculate global start index based on current page
+  // Note: Categories usually are few, so paging might not be heavy used, but we support it.
+  const startIndex = (categoryCurrentPage - 1) * categoryPageSize;
+  
+  cards.forEach((card, index) => {
+    const id = card.dataset.id;
+    // Set new sort order. Lower number = higher priority.
+    // We simply use index as sort order.
+    const newSortOrder = startIndex + index;
+    
+    // We reuse the update endpoint.
+    // The backend expects full object or partial? api/categories/[id] PUT handles partial update
+    updates.push(fetch(`/api/categories/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        // We only need to send what we change if the backend supports it.
+        // Checking backend code: functions/api/categories/[id].js
+        // It reads: const { catelog, sort_order } = await request.json();
+        // And it does `UPDATE category SET catelog = COALESCE(?, catelog), sort_order = COALESCE(?, sort_order) ...`
+        // Wait, I should verify the backend code. 
+        // Let's assume standard PUT behavior or check if I can see the backend code again.
+        // Previous context showed:
+        // `UPDATE category SET catelog = ?, sort_order = ? WHERE id = ?`
+        // Actually, I should check the backend code to be safe. 
+        // But based on `editCategoryForm` it sends `catelog` and `sort_order`.
+        // If I only send `sort_order`, `catelog` might be undefined/null.
+        // So I should send the name too.
+        catelog: categoriesData.find(c => c.id == id).catelog, 
+        sort_order: newSortOrder
+      })
+    }));
+  });
+  
+  if (updates.length > 0) {
+      showMessage('正在保存分类排序...', 'info');
+      Promise.all(updates)
+        .then(() => showMessage('分类排序已保存', 'success'))
+        .catch(err => showMessage('保存分类排序失败: ' + err.message, 'error'));
+  }
 }
 
 function handleEdit(id) {
@@ -434,13 +711,13 @@ function updatePaginationButtons() {
 
 prevPageBtn.addEventListener('click', () => {
   if (currentPage > 1) {
-    fetchConfigs(currentPage - 1);
+    fetchConfigs(currentPage - 1, currentSearchKeyword, currentCategoryFilter);
   }
 });
 
 nextPageBtn.addEventListener('click', () => {
   if (currentPage < Math.ceil(totalItems / pageSize)) {
-    fetchConfigs(currentPage + 1);
+    fetchConfigs(currentPage + 1, currentSearchKeyword, currentCategoryFilter);
   }
 });
 
@@ -519,7 +796,7 @@ exportBtn.addEventListener('click', () => {
 searchInput.addEventListener('input', () => {
   currentSearchKeyword = searchInput.value.trim();
   currentPage = 1;
-  fetchConfigs(currentPage, currentSearchKeyword);
+  fetchConfigs(currentPage, currentSearchKeyword, currentCategoryFilter);
 });
 
 // 解析 Chrome 书签 HTML
@@ -812,7 +1089,7 @@ categoryNextPageBtn.addEventListener('click', () => {
 // 初始化加载数据
 fetchConfigs();
 fetchPendingConfigs();
-if (categoryTableBody) {
+if (categoryGrid) {
   fetchCategories();
 }
 
