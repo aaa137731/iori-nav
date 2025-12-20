@@ -1817,13 +1817,48 @@ const initSettings = () => {
   const homeHitokotoColorInput = document.getElementById('homeHitokotoColor');
   const homeHitokotoColorPicker = document.getElementById('homeHitokotoColorPicker');
 
-  const homeCustomFontUrlInput = document.getElementById('homeCustomFontUrl');
   const homeTitleFontInput = document.getElementById('homeTitleFont');
   const homeSubtitleFontInput = document.getElementById('homeSubtitleFont');
   const homeStatsFontInput = document.getElementById('homeStatsFont');
   const homeHitokotoFontInput = document.getElementById('homeHitokotoFont');
 
   const searchEngineSwitch = document.getElementById('searchEngineSwitch');
+
+  // Font Options
+  const FONT_OPTIONS = [
+      { value: "", label: "默认字体" },
+      { value: "sans-serif", label: "Sans Serif (通用无衬线)" },
+      { value: "serif", label: "Serif (通用衬线)" },
+      { value: "monospace", label: "Monospace (通用等宽)" },
+      { value: "'Microsoft YaHei', sans-serif", label: "微软雅黑 (Windows)" },
+      { value: "'SimSun', serif", label: "宋体 (Windows)" },
+      { value: "'PingFang SC', sans-serif", label: "苹方 (Mac)" },
+      { value: "'Segoe UI', sans-serif", label: "Segoe UI (Windows)" },
+      { value: "'Noto Sans SC', sans-serif", label: "Noto Sans SC (Web)" },
+      { value: "'Noto Serif SC', serif", label: "Noto Serif SC (Web)" },
+      { value: "'Ma Shan Zheng', cursive", label: "马善政毛笔 (Web)" },
+      { value: "'ZCOOL KuaiLe', cursive", label: "站酷快乐体 (Web)" },
+      { value: "'Long Cang', cursive", label: "龙苍草书 (Web)" },
+      { value: "'Roboto', sans-serif", label: "Roboto (Web)" },
+      { value: "'Open Sans', sans-serif", label: "Open Sans (Web)" },
+      { value: "'Lato', sans-serif", label: "Lato (Web)" },
+      { value: "'Montserrat', sans-serif", label: "Montserrat (Web)" }
+  ];
+
+  function populateFontSelects() {
+      const selects = [homeTitleFontInput, homeSubtitleFontInput, homeStatsFontInput, homeHitokotoFontInput];
+      selects.forEach(select => {
+          if (!select) return;
+          select.innerHTML = '';
+          FONT_OPTIONS.forEach(opt => {
+              const option = document.createElement('option');
+              option.value = opt.value;
+              option.textContent = opt.label;
+              select.appendChild(option);
+          });
+      });
+  }
+  populateFontSelects();
 
   // Preview Logic
   function updatePreviewCards() {
@@ -1945,7 +1980,6 @@ const initSettings = () => {
     home_hitokoto_size: '',
     home_hitokoto_color: '',
     home_search_engine_enabled: false,
-    home_custom_font_url: '',
     home_title_font: '',
     home_subtitle_font: '',
     home_stats_font: '',
@@ -2361,7 +2395,6 @@ const initSettings = () => {
     currentSettings.home_hitokoto_size = homeHitokotoSizeInput.value.trim();
     currentSettings.home_hitokoto_color = homeHitokotoColorInput.value.trim();
 
-    currentSettings.home_custom_font_url = homeCustomFontUrlInput.value.trim();
     currentSettings.home_title_font = homeTitleFontInput.value.trim();
     currentSettings.home_subtitle_font = homeSubtitleFontInput.value.trim();
     currentSettings.home_stats_font = homeStatsFontInput.value.trim();
@@ -2482,7 +2515,6 @@ const initSettings = () => {
             if (serverSettings.home_hitokoto_size) currentSettings.home_hitokoto_size = serverSettings.home_hitokoto_size;
             if (serverSettings.home_hitokoto_color) currentSettings.home_hitokoto_color = serverSettings.home_hitokoto_color;
 
-            if (serverSettings.home_custom_font_url) currentSettings.home_custom_font_url = serverSettings.home_custom_font_url;
             if (serverSettings.home_title_font) currentSettings.home_title_font = serverSettings.home_title_font;
             if (serverSettings.home_subtitle_font) currentSettings.home_subtitle_font = serverSettings.home_subtitle_font;
             if (serverSettings.home_stats_font) currentSettings.home_stats_font = serverSettings.home_stats_font;
@@ -2636,7 +2668,6 @@ const initSettings = () => {
         }
     }
 
-    if (homeCustomFontUrlInput) homeCustomFontUrlInput.value = currentSettings.home_custom_font_url || '';
     if (homeTitleFontInput) homeTitleFontInput.value = currentSettings.home_title_font || '';
     if (homeSubtitleFontInput) homeSubtitleFontInput.value = currentSettings.home_subtitle_font || '';
     if (homeStatsFontInput) homeStatsFontInput.value = currentSettings.home_stats_font || '';

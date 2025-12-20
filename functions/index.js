@@ -1,6 +1,29 @@
 // functions/index.js
 import { isAdminAuthenticated } from './_middleware';
 
+// 字体映射表 (System Fonts + Google Fonts Mirror)
+const FONT_MAP = {
+  // System Fonts (无需引入)
+  'sans-serif': null,
+  'serif': null,
+  'monospace': null,
+  "'Microsoft YaHei', sans-serif": null,
+  "'SimSun', serif": null,
+  "'PingFang SC', sans-serif": null,
+  "'Segoe UI', sans-serif": null,
+  
+  // Web Fonts (fonts.loli.net)
+  "'Noto Sans SC', sans-serif": "https://fonts.loli.net/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap",
+  "'Noto Serif SC', serif": "https://fonts.loli.net/css2?family=Noto+Serif+SC:wght@400;700&display=swap",
+  "'Ma Shan Zheng', cursive": "https://fonts.loli.net/css2?family=Ma+Shan+Zheng&display=swap", // 书法
+  "'ZCOOL KuaiLe', cursive": "https://fonts.loli.net/css2?family=ZCOOL+KuaiLe&display=swap", // 快乐体
+  "'Long Cang', cursive": "https://fonts.loli.net/css2?family=Long+Cang&display=swap", // 草书
+  "'Roboto', sans-serif": "https://fonts.loli.net/css2?family=Roboto:wght@300;400;500;700&display=swap",
+  "'Open Sans', sans-serif": "https://fonts.loli.net/css2?family=Open+Sans:wght@400;600;700&display=swap",
+  "'Lato', sans-serif": "https://fonts.loli.net/css2?family=Lato:wght@400;700&display=swap",
+  "'Montserrat', sans-serif": "https://fonts.loli.net/css2?family=Montserrat:wght@400;700&display=swap"
+};
+
 // 辅助函数
 function escapeHTML(str) {
   if (!str) return '';
@@ -659,18 +682,31 @@ export async function onRequest(context) {
       // 实际上 CSS body.custom-wallpaper 选择器依赖此。
   }
   
-  if (layoutEnableFrostedGlass) {
-      const cssVarInjection = `<style>:root { --frosted-glass-blur: ${layoutFrostedGlassIntensity}px; }</style>`;
-      html = html.replace('</head>', `${cssVarInjection}</head>`);
-  }
+  // Inject Card CSS Variables
+  const cardCssVars = `<style>:root { --card-padding: 1.25rem; --card-radius: ${layoutCardBorderRadius}px; }</style>`;
+  html = html.replace('</head>', `${cardCssVars}</head>`);
 
+  // 自动注入字体资源
+  const usedFonts = new Set([homeTitleFont, homeSubtitleFont, homeStatsFont, homeHitokotoFont]);
+  let fontLinksHtml = '';
+  
+  usedFonts.forEach(font => {
+      if (font && FONT_MAP[font]) {
+          fontLinksHtml += `<link rel="stylesheet" href="${FONT_MAP[font]}">`;
+      }
+  });
+  
+  // 兼容旧版自定义 URL
   const safeCustomFontUrl = sanitizeUrl(homeCustomFontUrl);
   if (safeCustomFontUrl) {
-      const fontLink = `<link rel="stylesheet" href="${safeCustomFontUrl}">`;
-      html = html.replace('</head>', `${fontLink}</head>`);
+      fontLinksHtml += `<link rel="stylesheet" href="${safeCustomFontUrl}">`;
   }
 
-  // Inject Card CSS Variables
+  if (fontLinksHtml) {
+      html = html.replace('</head>', `${fontLinksHtml}</head>`);
+  }
+
+  // Inject Layout Config for Client-side JS
   const cardCssVars = `<style>:root { --card-padding: 1.25rem; --card-radius: ${layoutCardBorderRadius}px; }</style>`;
   html = html.replace('</head>', `${cardCssVars}</head>`);
 
